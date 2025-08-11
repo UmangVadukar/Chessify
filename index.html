@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Chess Trainer</title>
+
+  <!-- Font Awesome & Bootstrap -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <!-- Chessboard.js -->
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+    }
+
+
+    .white-1e1d7 {
+      background-color: #f0d9b5;
+    }
+
+    .black-3c85d {
+      background-color: #b58863;
+    }
+
+    .highlight-best {
+      background-color: rgba(255, 0, 0, 0.8) !important;
+      /* bright green with transparency */
+      box-shadow: inset 0 0 25px #ff0000 !important;
+      /* glow effect */
+    }
+
+
+    .move-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      font-size: 1rem;
+      background-color: #1e1e1e;
+      border: 1px solid #2c2c2c;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      transition: all 0.3s ease-in-out;
+      color: #e0e0e0;
+    }
+
+    .move-item:hover {
+      background-color: #2c3e50;
+      cursor: pointer;
+      transform: translateX(3px);
+    }
+
+    .move-item.active {
+      background-color: #0d6efd33;
+      font-weight: 600;
+      border-left: 4px solid #0d6efd;
+    }
+
+    .highlight-square {
+      border: 3px solid blue;
+    }
+
+    .move-number {
+      font-weight: bold;
+      margin-right: 12px;
+      color: #ffffff;
+    }
+
+    .move-text {
+      display: flex;
+      gap: 20px;
+      flex-grow: 1;
+    }
+
+    .board-section {
+      max-width: 100%;
+    }
+
+    .sidebar {
+      max-height: 500px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid #2c2c2c;
+    }
+
+    textarea.form-control {
+      background-color: #2c2c2c;
+      color: #ffffff;
+      border: 1px solid #444;
+    }
+
+    .btn-outline-secondary {
+      color: #ffffff;
+      border-color: #6c757d;
+    }
+
+    .btn-outline-secondary:hover {
+      background-color: #6c757d;
+      color: #ffffff;
+    }
+
+    .btn-success {
+      background-color: #198754;
+      border-color: #198754;
+    }
+
+    .btn-primary {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+
+    #engineOutput {
+      background: linear-gradient(135deg, #1e1e2f, #282c3a);
+      color: #c8d0f7;
+      font-family: 'Fira Mono', Consolas, Monaco, 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow:
+        0 4px 12px rgba(0, 0, 50, 0.5),
+        inset 0 0 10px #3a3f5a;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
+      user-select: text;
+      max-height: 300px;
+      overflow-y: auto;
+      overflow-x: hidden !important;
+    }
+
+
+    .card:hover {
+      transform: scale(1.02);
+    }
+
+    .card-text {
+      color: #ccc;
+    }
+
+    .btn-outline-primary {
+      color: #0d6efd;
+      border-color: #0d6efd;
+    }
+
+    .btn-outline-primary:hover {
+      background-color: #0d6efd;
+      color: white;
+    }
+
+    .opening-card {
+      border-radius: 10px;
+      transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      background: linear-gradient(to right, #1e1e1e, #252525);
+      border: 1px solid #444;
+    }
+
+    .opening-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 0 15px rgba(0, 123, 255, 0.3);
+    }
+
+    .opening-card .card-title {
+      font-weight: bold;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .opening-card .card-text {
+      color: #bbb;
+    }
+
+    .opening-card .btn-outline-primary {
+      font-size: 0.8rem;
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Sounds -->
+  <audio id="moveSound" src="move-self.mp3" preload="auto"></audio>
+  <audio id="captureSound" src="capture.mp3" preload="auto"></audio>
+
+  <div class="container-fluid px-4 py-4">
+
+    <div class="row gx-5 gy-4">
+
+      <div class="col-lg-7 d-flex flex-column align-items-center board-section">
+
+
+
+        <div id="myBoard" style="width: 100%; aspect-ratio: 1 / 1; max-width: 600px;">
+
+        </div>
+      </div>
+
+      <!-- Right: Sidebar -->
+      <div class="col-lg-5">
+        <div class="sidebar">
+          <div style="display: flex; justify-content: space-between;">
+            <h5>PGN Input</h5>
+            <div class="mb-3" style="display: flex; gap: 15px; align-items: center;">
+              <label for="boardThemeSelector" class="form-label text-light m-0"><i class="fa-solid fa-chess-board"
+                  style="font-size: xx-large;"></i></label>
+              <select id="boardThemeSelector" class="form-select bg-dark text-light border-secondary"
+                style="width: auto;">
+                <option value="classic" selected>Classic</option>
+                <option value="brown">Brown</option>
+                <option value="green">Green</option>
+                <option value="blue">Blue</option>
+                <option value="dark">Dark</option>
+              </select>
+
+              <label for="pieceSet" class="form-label text-light m-0"><i class="fa-solid fa-puzzle-piece"
+                  style="font-size: xx-large;"></i></label>
+              <select id="pieceSet" class="form-select bg-dark text-light border-secondary" style="width: auto;">
+                <option value="classic" selected>Classic </option>
+                <option value="alpha">Alpha </option>
+                <option value="symbol">Symbol</option>
+                <option value="chess24">Chess24 </option>
+              </select>
+            </div>
+
+
+          </div>
+          <div class="sticky-controls">
+            <textarea id="pgnInput" class="form-control mb-3" rows="6">
+1. f4 d6 2. d4 Nf6 3. Nf3 Bg4 4. Nc3 c6 5. e4 Nbd7 6. Be2 Qc7 7. O-O e5 8. dxe5 dxe5
+          </textarea>
+            <button onclick="loadPGN()" class="btn btn-success mb-3 w-100">Load PGN</button>
+          </div>
+
+
+
+
+          <h6>Move List</h6>
+          <div id="moveList" class="list-group"></div>
+        </div>
+
+        <div class="btn-group mt-3 w-100" role="group">
+          <button onclick="goToStart()" class="btn btn-outline-secondary"><i class="fa-solid fa-backward"></i></button>
+          <button onclick="prevMove()" class="btn btn-outline-secondary"><i class="fa-solid fa-caret-left"></i></button>
+          <button onclick="nextMove()" class="btn btn-outline-secondary"><i
+              class="fa-solid fa-caret-right"></i></button>
+          <button onclick="goToEnd()" class="btn btn-outline-secondary"><i class="fa-solid fa-forward"></i></button>
+
+          <button onclick="flipBoard()" class="btn btn-outline-secondary"><i class="fa-solid fa-retweet"></i>
+            Flip</button>
+        </div>
+        <pre id="engineOutput" class="bg-dark text-light p-2 mt-2 rounded"></pre>
+
+      </div>
+    </div>
+
+    <!-- Openings -->
+    <div class="row px-3" style="margin-top: 10rem;">
+      <div style="display: flex; justify-content: space-between;">
+        <h5 class="text-white mb-3">Popular Openings</h5>
+        <input type="text" id="searchBar" placeholder="Search openings..." class="form-control mb-3"
+          oninput="applyOpeningSearch()" style="width: 25%;" />
+
+      </div>
+
+      <ul id="openingsNav"></ul>
+      <br>
+      <div>
+        <h4 id="selectedOpeningTitle" class="text-white"></h4>
+        <div id="variationsList" class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4 g-4"></div>
+      </div>
+      <!-- <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4 g-4" id="openingCards"></div> -->
+    </div>
+  </div>
+  <script src="analysis.js"></script>
+
+  <script>
+    let game = new Chess();
+    let board;
+    let moves = [];
+    let currentMoveIndex = 0;
+
+    function playMoveSound() {
+      const sound = document.getElementById("moveSound");
+      if (sound) {
+        sound.currentTime = 0;
+        sound.play();
+      }
+    }
+
+
+    const pieceThemes = {
+      classic: piece => `https://raw.githubusercontent.com/jbkunst/chessboardjs-themes/refs/heads/master/chesspieces/wikipedia/${piece}.png`,
+      symbol: piece => `https://raw.githubusercontent.com/jbkunst/chessboardjs-themes/refs/heads/master/chesspieces/symbol/${piece}.png`,
+      alpha: piece => `https://raw.githubusercontent.com/jbkunst/chessboardjs-themes/refs/heads/master/chesspieces/alpha/${piece}.png`,
+      chess24: piece => `https://raw.githubusercontent.com/jbkunst/chessboardjs-themes/refs/heads/master/chesspieces/chess24/${piece}.png`,
+    };
+
+    document.getElementById('pieceSet').addEventListener('change', e => {
+      const themeFunc = pieceThemes[e.target.value];
+      const config = {
+        draggable: true,
+        position: 'start',
+        showNotation: true,
+        pieceTheme: themeFunc,
+        onDrop: function (source, target) {
+          const fenBefore = game.fen();
+
+          const move = game.move({ from: source, to: target, promotion: 'q' });
+          if (move === null) return 'snapback';
+
+          const fenAfter = game.fen();
+
+          move.captured ? document.getElementById('captureSound').play() : playMoveSound();
+          currentMoveIndex = game.history().length;
+          moves = game.history();
+          renderMoveList();
+
+          document.getElementById('engineOutput').textContent = 'Analyzing move...';
+
+          analyzeMove(
+            fenAfter,
+            move, // { from: "e2", to: "e4", san: "e4" }
+            {
+              depth: 12
+
+              , multiPV: 2
+            },
+            function (result) {
+              let output = `♟ Current Position Best Move: ${result.bestMoveAfter}\n`;
+              result.topLinesAfter.forEach((line, idx) => {
+                output += `📋 PV${idx + 1}: ${line.pv} (${line.eval} cp)\n`;
+              });
+
+              document.getElementById('engineOutput').textContent = output;
+
+              highlightBestMoveSquares(result.bestMoveAfter);
+
+
+            }
+          );
+
+
+
+
+        }
+      };
+
+
+      board = Chessboard('myBoard', config);
+    });
+
+
+    function isCastlingPathClear(color, side) {
+      if (color === 'w') {
+        if (side === 'kingside') {
+          return !game.get('f1') && !game.get('g1');
+        } else if (side === 'queenside') {
+          return !game.get('d1') && !game.get('c1') && !game.get('b1');
+        }
+      } else {
+        if (side === 'kingside') {
+          return !game.get('f8') && !game.get('g8');
+        } else if (side === 'queenside') {
+          return !game.get('d8') && !game.get('c8') && !game.get('b8');
+        }
+      }
+      return false; // fallback
+    }
+
+    // Updated chess board configuration with move analysis
+    const config = {
+      draggable: true,
+      position: 'start',
+      showNotation: true,
+      pieceTheme: pieceThemes.classic,
+      onDrop: function (source, target) {
+        // 1. Detect manual castling attempt before calling game.move()
+        const piece = game.get(source); // get piece on source square, e.g. 'wK'
+
+        if (piece && piece.type === 'k') {
+          const color = piece.color; // 'w' or 'b'
+          // king moves two squares horizontally → castling attempt
+          const fileFrom = source.charCodeAt(0);
+          const fileTo = target.charCodeAt(0);
+          const rankFrom = source.charAt(1);
+          const rankTo = target.charAt(1);
+
+          if (rankFrom === rankTo && Math.abs(fileFrom - fileTo) === 2) {
+            // This is a castling attempt, validate & do manual castle move
+
+            // Try kingside castling
+            if (target === (piece.color === 'w' ? 'g1' : 'g8')) {
+              if (!isCastlingPathClear(color, 'kingside')) {
+                // Path blocked → illegal castling
+                return 'snapback';
+              }
+              const rookSource = piece.color === 'w' ? 'h1' : 'h8';
+              const rookTarget = piece.color === 'w' ? 'f1' : 'f8';
+
+              // Move king
+              game.move({ from: source, to: target, promotion: 'q' });
+              // Move rook
+              game.move({ from: rookSource, to: rookTarget });
+
+              // Update board position from FEN after castling
+              board.position(game.fen());
+
+              // Play sound
+              playMoveSound();
+
+              // Update move list and state
+              currentMoveIndex = game.history().length;
+              moves = game.history();
+              renderMoveList();
+
+              // Analyze new position
+              const fenAfter = game.fen();
+              analyzeMove(
+                fenAfter,
+                { from: source, to: target, san: 'O-O' },
+                { depth: 12, multiPV: 2 },
+                function (result) {
+                  let output = `♟ Current Position Best Move: ${result.bestMoveAfter}\n`;
+                  result.topLinesAfter.forEach((line, idx) => {
+                    output += `📋 PV${idx + 1}: ${line.pv} (${line.eval} cp)\n`;
+                  });
+                  document.getElementById('engineOutput').textContent = output;
+                  highlightBestMoveSquares(result.bestMoveAfter);
+
+
+                }
+              );
+
+              return; // done manual castling, skip rest of onDrop
+            }
+
+            // Try queenside castling
+            if (target === (piece.color === 'w' ? 'c1' : 'c8')) {
+              if (!isCastlingPathClear(color, 'queenside')) {
+                return 'snapback';
+              }
+              const rookSource = piece.color === 'w' ? 'a1' : 'a8';
+              const rookTarget = piece.color === 'w' ? 'd1' : 'd8';
+
+              // Move king
+              game.move({ from: source, to: target, promotion: 'q' });
+              // Move rook
+              game.move({ from: rookSource, to: rookTarget });
+
+              // Update board position from FEN after castling
+              board.position(game.fen());
+
+              // Play sound
+              playMoveSound();
+
+              // Update move list and state
+              currentMoveIndex = game.history().length;
+              moves = game.history();
+              renderMoveList();
+
+              // Analyze new position
+              const fenAfter = game.fen();
+              analyzeMove(
+                fenAfter,
+                { from: source, to: target, san: 'O-O-O' },
+                { depth: 12, multiPV: 2 },
+                function (result) {
+                  let output = `♟ Current Position Best Move: ${result.bestMoveAfter}\n`;
+                  result.topLinesAfter.forEach((line, idx) => {
+                    output += `📋 PV${idx + 1}: ${line.pv} (${line.eval} cp)\n`;
+                  });
+                  document.getElementById('engineOutput').textContent = output;
+                  highlightBestMoveSquares(result.bestMoveAfter);
+
+
+                }
+              );
+
+              return; // done manual castling, skip rest of onDrop
+            }
+          }
+        }
+
+        // 2. Otherwise, normal move handling (your existing code)
+
+        const fenBefore = game.fen();
+
+        const move = game.move({ from: source, to: target, promotion: 'q' });
+        if (move === null) return 'snapback';
+
+        const fenAfter = game.fen();
+
+        move.captured ? document.getElementById('captureSound').play() : playMoveSound();
+        currentMoveIndex = game.history().length;
+        moves = game.history();
+        renderMoveList();
+
+        document.getElementById('engineOutput').textContent = 'Analyzing move...';
+
+        analyzeMove(
+          fenAfter,
+          move, // { from: "e2", to: "e4", san: "e4" }
+          { depth: 12, multiPV: 2 },
+          function (result) {
+            let output = `♟ Current Position Best Move: ${result.bestMoveAfter}\n`;
+            result.topLinesAfter.forEach((line, idx) => {
+              output += `📋 PV${idx + 1}: ${line.pv} (${line.eval} cp)\n`;
+            });
+
+            document.getElementById('engineOutput').textContent = output;
+
+            highlightBestMoveSquares(result.bestMoveAfter);
+
+
+          }
+        );
+      }
+    };
+
+    board = Chessboard('myBoard', config);
+
+
+    function flipBoard() {
+      board.flip();
+    }
+
+
+    function updateBoard() {
+      board.position(game.fen());
+      updateMoveListHighlight();
+    }
+
+    function nextMove() {
+      if (currentMoveIndex < moves.length) {
+        const move = game.move(moves[currentMoveIndex++]);
+        move?.captured && document.getElementById('captureSound').play();
+        playMoveSound();
+        updateBoard();
+
+        // Get FEN after the move (current position)
+        const fenAfter = game.fen();
+
+        // Run analyzeMove on this position
+        analyzeMove(
+          fenAfter,
+          move,                  // move object returned by chess.js, includes from, to, san etc.
+          { depth: 12, multiPV: 2 },
+          function (result) {
+            // Handle the engine analysis output here
+            let output = `♟ Current Position Best Move: ${result.bestMoveAfter}\n`;
+            result.topLinesAfter.forEach((line, idx) => {
+              output += `📋 PV${idx + 1}: ${line.pv} (${line.eval} cp)\n`;
+            });
+            document.getElementById('engineOutput').textContent = output;
+
+            // Optional: highlight best move squares on board
+            highlightBestMoveSquares(result.bestMoveAfter);
+          }
+        );
+      }
+    }
+
+    function prevMove() {
+      if (currentMoveIndex > 0) {
+        game.undo();
+        currentMoveIndex--;
+        playMoveSound();
+        updateBoard();
+
+        const fenAfter = game.fen();
+
+        const history = game.history({ verbose: true });
+        const lastMove = history.length > 0 ? history[history.length - 1] : null;
+
+        analyzeMove(
+          fenAfter,
+          lastMove,
+          { depth: 12, multiPV: 2 },
+          function (result) {
+            let output = `♟ Current Position Best Move: ${result.bestMoveAfter}\n`;
+            result.topLinesAfter.forEach((line, idx) => {
+              output += `📋 PV${idx + 1}: ${line.pv} (${line.eval} cp)\n`;
+            });
+            document.getElementById('engineOutput').textContent = output;
+
+            highlightBestMoveSquares(result.bestMoveAfter);
+
+
+          }
+        );
+      }
+    }
+
+
+    function highlightBestMoveSquares(bestMoveAfter) {
+      const bestUCI = bestMoveAfter; // e.g. "d1f3"
+      const fromSquare = bestUCI.substring(0, 2); // "d1"
+      const toSquare = bestUCI.substring(2, 4);   // "f3"
+
+      // Example for chessboard.js (remove existing highlights first)
+      document.querySelectorAll('.square-55d63').forEach(sq => {
+        sq.classList.remove('highlight-best');
+      });
+      document.querySelector(`.square-${fromSquare}`).classList.add('highlight-best');
+      document.querySelector(`.square-${toSquare}`).classList.add('highlight-best');
+    }
+    function goToStart() {
+      game.reset();
+      currentMoveIndex = 0;
+      updateBoard();
+    }
+
+    function goToEnd() {
+      game.reset();
+      moves.forEach(move => game.move(move));
+      currentMoveIndex = moves.length;
+      playMoveSound();
+      updateBoard();
+    }
+
+    function loadPGN() {
+      const pgn = document.getElementById('pgnInput').value;
+      game = new Chess();
+      if (!game.load_pgn(pgn)) return alert("Invalid PGN");
+      moves = game.history();
+      currentMoveIndex = 0;
+      game.reset();
+      board.position(game.fen());
+      renderMoveList();
+    }
+
+    function renderMoveList() {
+      const container = document.getElementById('moveList');
+      container.innerHTML = '';
+      for (let i = 0; i < moves.length; i += 2) {
+        const moveNum = Math.floor(i / 2) + 1;
+        const white = moves[i], black = moves[i + 1] || '';
+        const div = document.createElement('div');
+        div.className = 'list-group-item move-item';
+        div.dataset.index = i;
+        div.innerHTML = `<span class="move-number">${moveNum}.</span>
+                         <span class="move-text">
+                           <span class="text-primary">${white}</span>
+                           <span class="text-light">${black}</span>
+                         </span>`;
+        div.onclick = () => {
+          game.reset();
+          for (let j = 0; j <= i + 1; j++) if (moves[j]) game.move(moves[j]);
+          currentMoveIndex = i + 2;
+          updateBoard();
+        };
+        container.appendChild(div);
+      }
+      updateMoveListHighlight();
+    }
+
+    function updateMoveListHighlight() {
+      document.querySelectorAll('.move-item').forEach(item => {
+        const i = parseInt(item.dataset.index);
+        item.classList.toggle('active', currentMoveIndex - 1 === i || currentMoveIndex - 2 === i);
+      });
+    }
+
+    const boardThemes = {
+      classic: { white: '#f0d9b5', black: '#b58863' },
+      brown: { white: '#fae4ae', black: '#d18815' },
+      green: { white: '#eaeed0', black: '#779952' },
+      blue: { white: '#dee3e6', black: '#51779c' },
+      dark: { white: '#dcdcdc', black: '#333333' }
+    };
+
+    function updateBoardTheme(themeName) {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .white-1e1d7 { background-color: ${boardThemes[themeName].white} !important; }
+        .black-3c85d { background-color: ${boardThemes[themeName].black} !important; }
+      `;
+      document.getElementById('board-theme-style')?.remove();
+      style.id = 'board-theme-style';
+      document.head.appendChild(style);
+    }
+
+    document.getElementById('boardThemeSelector').addEventListener('change', function () {
+      updateBoardTheme(this.value);
+    });
+
+
+
+    let openings = [];
+    let openingsToRender = [];
+
+    function loadOpeningsFromJSON() {
+      fetch('csvjson.json')
+        .then(response => response.json())
+        .then(data => {
+          openings = data;
+          openingsToRender = openings; // initially all
+
+          groupedOpenings = openings.reduce((groups, item) => {
+            const key = item.Opening.split(",")[0].trim(); // family before comma
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(item);
+            return groups;
+          }, {});
+
+          console.log(groupedOpenings)
+          renderOpeningNav();
+          // renderOpeningCards();
+        })
+        .catch(err => {
+          console.error("Failed to load openings.json:", err);
+        });
+    }
+
+    function renderOpeningNav() {
+      const nav = document.getElementById("openingsNav");
+      nav.innerHTML = "";
+      nav.classList.add("d-flex", "flex-wrap", "gap-2");
+
+      Object.keys(groupedOpenings).forEach(family => {
+        const badge = document.createElement("span");
+        badge.classList.add("badge", "bg-secondary", "p-2");
+        badge.style.cursor = "pointer";
+        badge.textContent = family;
+        badge.classList.add("rounded-pill");
+        badge.onclick = () => {
+          // Remove warning class from all badges first
+          document.querySelectorAll('.badge').forEach(b => {
+            b.classList.remove('bg-primary');
+            b.classList.add('bg-secondary'); // reset to original (or whatever default color you use)
+          });
+
+          // Change the clicked badge to warning color
+          badge.classList.remove('bg-secondary');
+          badge.classList.add('bg-primary');
+
+          // Call your function
+          showVariations(family);
+        };
+
+        nav.appendChild(badge);
+      });
+    }
+
+
+
+    function showVariations(family) {
+      const variationsContainer = document.getElementById("variationsList");
+      const title = document.getElementById("selectedOpeningTitle");
+
+      title.textContent = family;
+      variationsContainer.innerHTML = "";
+
+      groupedOpenings[family].forEach(opening => {
+        const col = document.createElement("div");
+        col.classList.add("col");
+        col.innerHTML = `
+      <div class="card opening-card bg-dark text-light border-secondary h-100">
+        <div class="card-body">
+          <h5 class="card-title text-white">${opening.Opening}</h5>
+          <p class="card-text small text-light">
+            White win: ${opening["White_win%"]}%<br>
+            Black win: ${opening["Black_win%"]}%
+          </p>
+          <button class="btn btn-outline-primary btn-sm" onclick="loadOpeningPGN('${opening.Moves}')">
+            Load Opening
+          </button>
+        </div>
+      </div>
+    `;
+        variationsContainer.appendChild(col);
+      });
+    }
+
+    const input = document.getElementById("searchBar");
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const query = input.value.toLowerCase().trim();
+        openingsToRender = openings.filter(o =>
+          o.Opening.toLowerCase().includes(query)
+        );
+        renderOpeningCards();
+      }
+
+    });
+
+
+
+    function renderOpeningCards() {
+      const container = document.getElementById("variationsList");
+      container.innerHTML = ""; // clear previous cards
+      openingsToRender.forEach(opening => {
+        const col = document.createElement("div");
+        col.classList.add("col");
+        col.innerHTML = `
+      <div class="card opening-card bg-dark text-light border-secondary h-100">
+        <div class="card-body">
+          <h5 class="card-title text-white">${opening.Opening}</h5>
+          <p class="card-text small text-light">
+            White win: ${opening["White_win%"]}%<br>
+            Black win: ${opening["Black_win%"]}%
+          </p>
+          <button class="btn btn-outline-primary btn-sm" onclick="loadOpeningPGN('${opening.Moves}')">
+            Load Opening
+          </button>
+        </div>
+      </div>
+    `;
+        container.appendChild(col);
+      });
+    }
+    loadOpeningsFromJSON();
+
+    function loadOpeningPGN(pgn) {
+      document.getElementById("pgnInput").value = pgn;
+      const boardElement = document.getElementById("myBoard");
+      if (boardElement) {
+        boardElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+
+        loadPGN();
+
+      }
+    }
+
+
+
+
+    // Init
+    updateBoardTheme('classic');
+    loadPGN();
+
+
+    // Keyboard navigation
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') {
+        nextMove();
+      } else if (e.key === 'ArrowLeft') {
+        if (currentMoveIndex > -1) {
+          prevMove();
+        } else {
+          board.start();
+          previousHighlightedSquares.forEach(sq => {
+            const el = document.querySelector(`.square-${sq}`);
+            if (el) el.classList.remove('highlight-square');
+          });
+        }
+      }
+    });
+
+
+  </script>
+</body>
+
+</html>
