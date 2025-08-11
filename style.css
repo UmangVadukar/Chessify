@@ -182,6 +182,10 @@ textarea.form-control {
         z-index: 10;
     }
 
+    .attr-buttons{
+        display: block !important;
+    }
+
     .sidebar {
         max-height: none;
         overflow: visible;
